@@ -3850,12 +3850,12 @@ cffi = {version = "*", markers = "implementation_name == \"pypy\""}
 
 [[package]]
 name = "qblox-instruments"
-version = "0.11.0"
+version = "0.12.0"
 description = "Instrument drivers for Qblox devices."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "qblox_instruments-0.11.0.tar.gz", hash = "sha256:568ad120723eeec061b5c811b5210c10c40a1d26b82998593833befdcd1bdbf2"},
+    {file = "qblox_instruments-0.12.0.tar.gz", hash = "sha256:568ad120723eeec061b5c811b5210c10c40a1d26b82998593833befdcd1bdbf2"},
 ]
 
 [package.dependencies]
