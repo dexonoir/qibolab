@@ -116,6 +116,7 @@ class QbloxController(Controller):
     def _execute_pulse_sequence(
         self,
         qubits: dict,
+        couplers: dict,
         sequence: PulseSequence,
         options: ExecutionParameters,
         sweepers: list() = [],  # list(Sweeper) = []
@@ -175,7 +176,9 @@ class QbloxController(Controller):
                     pulse._if = int(pulse.frequency - pulse_channel.lo_frequency)
 
             #  ask each module to generate waveforms & program and upload them to the device
-            module.process_pulse_sequence(qubits, module_pulses[name], navgs, nshots, repetition_duration, sweepers)
+            module.process_pulse_sequence(
+                qubits, couplers, module_pulses[name], navgs, nshots, repetition_duration, sweepers
+            )
 
             # log.info(f"{self.modules[name]}: Uploading pulse sequence")
             module.upload()
@@ -224,7 +227,7 @@ class QbloxController(Controller):
         return data
 
     def play(self, qubits, couplers, sequence, options):
-        return self._execute_pulse_sequence(qubits, sequence, options)
+        return self._execute_pulse_sequence(qubits, couplers, sequence, options)
 
     def split_batches(self, sequences):
         return batch_max_sequences(sequences, MAX_BATCH_SIZE)
@@ -280,6 +283,7 @@ class QbloxController(Controller):
         # execute the each sweeper recursively
         self._sweep_recursion(
             qubits,
+            couplers,
             sequence_copy,
             options,
             *tuple(sweepers_copy),
@@ -296,6 +300,7 @@ class QbloxController(Controller):
     def _sweep_recursion(
         self,
         qubits,
+        couplers,
         sequence,
         options: ExecutionParameters,
         *sweepers,
@@ -366,13 +371,16 @@ class QbloxController(Controller):
                 if len(sweepers) > 1:
                     self._sweep_recursion(
                         qubits,
+                        couplers,
                         sequence,
                         options,
                         *sweepers[1:],
                         results=results,
                     )
                 else:
-                    result = self._execute_pulse_sequence(qubits=qubits, sequence=sequence, options=options)
+                    result = self._execute_pulse_sequence(
+                        qubits=qubits, couplers=couplers, sequence=sequence, options=options
+                    )
                     for pulse in sequence.ro_pulses:
                         if results[pulse.id]:
                             results[pulse.id] += result[pulse.serial]
@@ -412,7 +420,7 @@ class QbloxController(Controller):
                             qubits=sweeper.qubits,
                         )
                         self._sweep_recursion(
-                            qubits, sequence, options, *((split_sweeper,) + sweepers[1:]), results=results
+                            qubits, couplers, sequence, options, *((split_sweeper,) + sweepers[1:]), results=results
                         )
                         _from = _to
 
@@ -444,7 +452,7 @@ class QbloxController(Controller):
                     #             elif pulse.type == PulseType.DRIVE:
                     #                 qubits[pulse.qubit].drive.gain = 1
 
-                    result = self._execute_pulse_sequence(qubits, sequence, options, sweepers)
+                    result = self._execute_pulse_sequence(qubits, couplers, sequence, options, sweepers)
                     for pulse in sequence.ro_pulses:
                         if results[pulse.id]:
                             results[pulse.id] += result[pulse.serial]
@@ -465,6 +473,7 @@ class QbloxController(Controller):
                             _nshots = min(max_rt_nshots, nshots - sft_iteration * max_rt_nshots)
                             self._sweep_recursion(
                                 qubits,
+                                couplers,
                                 sequence,
                                 options,
                                 *sweepers,
@@ -491,5 +500,10 @@ class QbloxController(Controller):
                                 )
 
                                 self._sweep_recursion(
-                                    qubits, sequence, options, *((split_sweeper,) + sweepers[1:]), results=results
+                                    qubits,
+                                    couplers,
+                                    sequence,
+                                    options,
+                                    *((split_sweeper,) + sweepers[1:]),
+                                    results=results,
                                 )

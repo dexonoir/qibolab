@@ -408,6 +408,7 @@ class ClusterQRM_RF(Instrument):
     def process_pulse_sequence(
         self,
         qubits: dict,
+        couplers: dict,
         instrument_pulses: PulseSequence,
         navgs: int,
         nshots: int,
