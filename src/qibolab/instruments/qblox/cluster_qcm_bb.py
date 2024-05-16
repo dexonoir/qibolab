@@ -254,11 +254,11 @@ class QcmBb(ClusterModule):
             # TODO: Throw error in that event or implement for non_overlapping_same_frequency_pulses
             # Even better, set the frequency before each pulse is played (would work with hardware modulation only)
             if qubit:
-                self.ports[port].offset = qubit.sweetspot
+                self._ports[port].offset = qubit.sweetspot
             elif coupler:
-                self.ports[port].offset = coupler.sweetspot
+                self._ports[port].offset = coupler.sweetspot
             else:
-                self.ports[port].offset = 0
+                self._ports[port].offset = 0
 
         # create sequencer wrapper
         sequencer = Sequencer(next_sequencer_number)
