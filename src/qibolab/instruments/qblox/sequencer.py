@@ -113,7 +113,7 @@ class WaveformsBuffer:
         # there may be other waveforms stored already, set first index as the next available
         first_idx = len(self.unique_waveforms)
 
-        if pulse.type == PulseType.FLUX:
+        if pulses[n].type == PulseType.FLUX or pulses[n].type == PulseType.COUPLERFLUX:
             # for flux pulses, store i waveforms
             idx_range = np.arange(first_idx, first_idx + len(values), 1)
 
@@ -214,3 +214,4 @@ class Sequencer:
         self.weights: dict = {}
         self.program: Program = Program()
         self.qubit = None  # self.qubit: int | str = None
+        self.coupler = None  # self.coupler: int | str = None

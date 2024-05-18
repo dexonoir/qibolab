@@ -100,7 +100,7 @@ class QbloxController(Controller):
             self.cluster.disconnect()
             self.is_connected = False
 
-    def _set_module_channel_map(self, module: ClusterQRM_RF, qubits: dict):
+    def _set_module_channel_map(self, module: ClusterQRM_RF, qubits: dict, couplers: dict):
         """Retrieve all the channels connected to a specific Qblox module.
 
         This method updates the `channel_port_map` attribute of the specified Qblox module
@@ -109,6 +109,10 @@ class QbloxController(Controller):
         Return the list of channels connected to module_name"""
         for qubit in qubits.values():
             for channel in qubit.channels:
+                if channel.port and channel.port.module.name == module.name:
+                    module.channel_map[channel.name] = channel
+        for coupler in couplers.values():
+            for channel in coupler.channels:
                 if channel.port and channel.port.module.name == module.name:
                     module.channel_map[channel.name] = channel
         return list(module.channel_map)
@@ -167,7 +171,7 @@ class QbloxController(Controller):
         data = {}
         for name, module in self.modules.items():
             # from the pulse sequence, select those pulses to be synthesised by the module
-            module_channels = self._set_module_channel_map(module, qubits)
+            module_channels = self._set_module_channel_map(module, qubits, couplers)
             module_pulses[name] = sequence.get_channel_pulses(*module_channels)
 
             if isinstance(module, (ClusterQRM_RF, ClusterQCM_RF)):
@@ -260,6 +264,7 @@ class QbloxController(Controller):
                     values=sweeper.values,
                     pulses=ps,
                     qubits=sweeper.qubits,
+                    couplers=sweeper.couplers,
                     type=sweeper.type,
                 )
             )
@@ -418,6 +423,7 @@ class QbloxController(Controller):
                             values=_values,
                             pulses=sweeper.pulses,
                             qubits=sweeper.qubits,
+                            couplers=sweeper.couplers,
                         )
                         self._sweep_recursion(
                             qubits, couplers, sequence, options, *((split_sweeper,) + sweepers[1:]), results=results
