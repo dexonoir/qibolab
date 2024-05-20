@@ -263,6 +263,7 @@ class QcmBb(ClusterModule):
         # create sequencer wrapper
         sequencer = Sequencer(next_sequencer_number)
         sequencer.qubit = qubit.name if qubit else None
+        sequencer.coupler = coupler.name if coupler else None
         return sequencer
 
     def get_if(self, pulse):
@@ -511,7 +512,10 @@ class QcmBb(ClusterModule):
                             )
 
                     else:  # qubit_sweeper_parameters
-                        if sequencer.qubit in [qubit.name for qubit in sweeper.qubits]:
+                        # if sequencer.qubit in [qubit.name for qubit in sweeper.qubits]:
+                        if (sweeper.qubits and sequencer.qubit in [_.name for _ in sweeper.qubits]) or (
+                            sweeper.couplers and sequencer.coupler in [_.name for _ in sweeper.couplers]
+                        ):
                             # plays an active role
                             if sweeper.parameter == Parameter.bias:
                                 reference_value = self._ports[port].offset
@@ -634,7 +638,7 @@ class QcmBb(ClusterModule):
                         and pulses[n].sweeper.type == QbloxSweeperType.duration
                     ):
                         RI = pulses[n].sweeper.register
-                        if pulses[n].type == PulseType.FLUX:
+                        if pulses[n].type == PulseType.FLUX or pulses[n].type == PulseType.COUPLERFLUX:
                             RQ = pulses[n].sweeper.register
                         else:
                             RQ = pulses[n].sweeper.aux_register
