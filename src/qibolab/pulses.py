@@ -583,11 +583,13 @@ class Custom(PulseShape):
     """Arbitrary shape."""
 
     def __init__(self, envelope_i, envelope_q=None):
+        from ast import literal_eval
+
         self.name = "Custom"
         self.pulse: Pulse = None
-        self.envelope_i: np.ndarray = np.array(envelope_i)
+        self.envelope_i: np.ndarray = np.array(literal_eval(envelope_i))
         if envelope_q is not None:
-            self.envelope_q: np.ndarray = np.array(envelope_q)
+            self.envelope_q: np.ndarray = np.array(literal_eval(envelope_q))
         else:
             self.envelope_q = self.envelope_i
 
@@ -596,11 +598,11 @@ class Custom(PulseShape):
         """The envelope waveform of the i component of the pulse."""
 
         if self.pulse:
-            if self.pulse.duration != len(self.envelope_i):
+            if self.pulse.duration > len(self.envelope_i):
                 raise ValueError("Length of envelope_i must be equal to pulse duration")
             num_samples = int(np.rint(self.pulse.duration / 1e9 * PulseShape.SAMPLING_RATE))
 
-            waveform = Waveform(self.envelope_i * self.pulse.amplitude)
+            waveform = Waveform(np.clip(self.envelope_i[:num_samples] * self.pulse.amplitude, -1, 1))
             waveform.serial = f"Envelope_Waveform_I(num_samples = {num_samples}, amplitude = {format(self.pulse.amplitude, '.6f').rstrip('0').rstrip('.')}, shape = {repr(self)})"
             return waveform
         raise ShapeInitError
@@ -610,11 +612,11 @@ class Custom(PulseShape):
         """The envelope waveform of the q component of the pulse."""
 
         if self.pulse:
-            if self.pulse.duration != len(self.envelope_q):
+            if self.pulse.duration > len(self.envelope_q):
                 raise ValueError("Length of envelope_q must be equal to pulse duration")
             num_samples = int(np.rint(self.pulse.duration / 1e9 * PulseShape.SAMPLING_RATE))
 
-            waveform = Waveform(self.envelope_q * self.pulse.amplitude)
+            waveform = Waveform(np.clip(self.envelope_q[:num_samples] * self.pulse.amplitude, -1, 1))
             waveform.serial = f"Envelope_Waveform_Q(num_samples = {num_samples}, amplitude = {format(self.pulse.amplitude, '.6f').rstrip('0').rstrip('.')}, shape = {repr(self)})"
             return waveform
         raise ShapeInitError
@@ -953,7 +955,7 @@ class Pulse:
             shape_name = re.findall(r"(\w+)", value)[0]
             if shape_name not in globals():
                 raise ValueError(f"shape {value} not found")
-            shape_parameters = re.findall(r"[\w+\d\.\d]+", value)[1:]
+            shape_parameters = re.findall(r"\[.*?\]|[\w+\d\.\d]+", value)[1:]
             # TODO: create multiple tests to prove regex working correctly
             self._shape = globals()[shape_name](*shape_parameters)
 
