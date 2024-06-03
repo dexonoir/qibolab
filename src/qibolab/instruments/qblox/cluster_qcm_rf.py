@@ -181,12 +181,10 @@ class ClusterQCM_RF(Instrument):
 
             self.is_connected = True
             # once connected, initialise the parameters of the device to the default values
-            self._set_device_parameter(
-                self.device, "out0_offset_path0", "out0_offset_path1", value=0
-            )  # Default after reboot = 7.625
-            self._set_device_parameter(
-                self.device, "out1_offset_path0", "out1_offset_path1", value=0
-            )  # Default after reboot = 7.625
+            self._set_device_parameter(self.device, "out0_offset_path0", value=0)  # Default after reboot = 7.625
+            self._set_device_parameter(self.device, "out0_offset_path1", value=0)  # Default after reboot = 7.625
+            self._set_device_parameter(self.device, "out1_offset_path0", value=0)  # Default after reboot = 7.625
+            self._set_device_parameter(self.device, "out1_offset_path1", value=0)  # Default after reboot = 7.625
 
             # initialise the parameters of the default sequencers to the default values,
             # the rest of the sequencers are not configured here, but will be configured
@@ -245,10 +243,15 @@ class ClusterQCM_RF(Instrument):
             try:
                 for port in self.settings:
                     self._sequencers[port] = []
-                    if self.settings[port]["lo_frequency"]:
+
+                    if "attenuation" in self.settings[port]:
+                        self.ports[port].attenuation = self.settings[port]["attenuation"]
+                    if "lo_frequency" in self.settings[port]:
                         self.ports[port].lo_enabled = True
                         self.ports[port].lo_frequency = self.settings[port]["lo_frequency"]
-                    self.ports[port].attenuation = self.settings[port]["attenuation"]
+                    if "mixer_calibration" in self.settings[port]:
+                        self.ports[port].mixer_calibration = self.settings[port]["mixer_calibration"]
+
                     self.ports[port].hardware_mod_en = True
                     self.ports[port].nco_freq = 0
                     self.ports[port].nco_phase_offs = 0

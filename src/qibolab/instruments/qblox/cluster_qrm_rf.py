@@ -197,9 +197,8 @@ class ClusterQRM_RF(Instrument):
 
             # once connected, initialise the parameters of the device to the default values
             self._set_device_parameter(self.device, "in0_att", value=0)
-            self._set_device_parameter(
-                self.device, "out0_offset_path0", "out0_offset_path1", value=0
-            )  # Default after reboot = 7.625
+            self._set_device_parameter(self.device, "out0_offset_path0", value=0)  # Default after reboot = 7.625
+            self._set_device_parameter(self.device, "out0_offset_path1", value=0)  # Default after reboot = 7.625
             self._set_device_parameter(
                 self.device, "scope_acq_avg_mode_en_path0", "scope_acq_avg_mode_en_path1", value=True
             )
@@ -246,10 +245,14 @@ class ClusterQRM_RF(Instrument):
                 )  # Default after reboot = True
             try:
                 if "o1" in self.settings:
-                    self.ports["o1"].attenuation = self.settings["o1"]["attenuation"]
-                    if self.settings["o1"]["lo_frequency"]:
+                    if "attenuation" in self.settings["o1"]:
+                        self.ports["o1"].attenuation = self.settings["o1"]["attenuation"]
+                    if "lo_frequency" in self.settings["o1"]:
                         self.ports["o1"].lo_enabled = True
                         self.ports["o1"].lo_frequency = self.settings["o1"]["lo_frequency"]
+                    if "mixer_calibration" in self.settings["o1"]:
+                        self.ports["o1"].mixer_calibration = self.settings["o1"]["mixer_calibration"]
+
                     self.ports["o1"].hardware_mod_en = True
                     self.ports["o1"].nco_freq = 0
                     self.ports["o1"].nco_phase_offs = 0
