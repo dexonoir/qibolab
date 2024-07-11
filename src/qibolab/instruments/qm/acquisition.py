@@ -15,7 +15,6 @@ from qibolab.execution_parameters import (
     AveragingMode,
     ExecutionParameters,
 )
-from qibolab.qubits import QubitId
 from qibolab.result import (
     AveragedIntegratedResults,
     AveragedRawWaveformResults,
@@ -42,7 +41,6 @@ class Acquisition(ABC):
     instruments."""
     element: str
     """Element from QM ``config`` that the pulse will be applied on."""
-    qubit: QubitId
     average: bool
 
     keys: list[str] = field(default_factory=list)
@@ -254,7 +252,6 @@ ACQUISITION_TYPES = {
 def create_acquisition(
     operation: str,
     element: str,
-    qubit: QubitId,
     options: ExecutionParameters,
     threshold: float,
     angle: float,
@@ -265,7 +262,6 @@ def create_acquisition(
     Args:
         operation (str):
         element (str):
-        qubit (str): Name of the qubit.
         options (:class:`qibolab.execution_parameters.ExecutionParameters`): Execution
             options containing acquisition type and averaging mode.
 
@@ -277,7 +273,7 @@ def create_acquisition(
     if options.acquisition_type is AcquisitionType.DISCRIMINATION:
         kwargs = {"threshold": threshold, "angle": angle}
     acquisition = ACQUISITION_TYPES[options.acquisition_type](
-        operation, element, qubit, average, **kwargs
+        operation, element, average, **kwargs
     )
     return acquisition
 
@@ -299,7 +295,6 @@ def fetch_results(result, acquisitions):
         data = acquisition.fetch(handles)
         for serial, result in zip(acquisition.keys, data):
             results[serial].append(result)
-            results[acquisition.qubit] = results[serial]
 
     # collapse single element lists for back-compatibility
     return {
