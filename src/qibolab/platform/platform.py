@@ -346,7 +346,11 @@ class Platform:
         # so that each acquisition command carries the info with it.
         integration_setup: dict[str, tuple[np.ndarray, float]] = {}
         for qubit in self.qubits.values():
-            integration_setup[qubit.acquisition.name] = (qubit.kernel, qubit.iq_angle)
+            integration_setup[qubit.acquisition.name] = (
+                qubit.kernel,
+                qubit.threshold,
+                qubit.iq_angle,
+            )
 
         result = {}
         for instrument in self.instruments.values():
