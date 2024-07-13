@@ -203,17 +203,7 @@ class Platform:
 
     def _execute(self, sequences, options, **kwargs):
         """Executes sequence on the controllers."""
-        result = {}
-
-        for instrument in self.instruments.values():
-            if isinstance(instrument, Controller):
-                new_result = instrument.play(
-                    options.component_configs, sequences, options, {}
-                )
-                if isinstance(new_result, dict):
-                    result.update(new_result)
-
-        return result
+        return self.sweep(sequences[0], options)
 
     def execute_pulse_sequence(
         self,
