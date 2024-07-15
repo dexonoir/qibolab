@@ -285,11 +285,7 @@ class Platform:
         for seq_batch in batch(sequences, bounds):
             result = self._execute(seq_batch, options, **kwargs)
             for serial, data in result.items():
-                results[serial].extend(data)
-
-        # FIXME: is this really needed? What if a single qubit has multiple measurements?
-        # for serial, qubit in ro_pulses.items():
-        #     results[qubit] = results[serial]
+                results[serial].append(data)
 
         return results
 
