@@ -159,4 +159,4 @@ def dump_runcard(platform: Platform, path: Path):
         settings["topology"] = {coupler: list(pair) for pair, coupler in zip(platform.pairs, platform.couplers)}
 
     settings.update(dump_qubits(platform.qubits, platform.pairs, platform.couplers))
-    path.write_text(yaml.dump(settings, sort_keys=False, indent=4, default_flow_style=None))
+    path.write_text(yaml.dump(settings, sort_keys=False, indent=2, default_flow_style=None))
