@@ -30,10 +30,22 @@ In this example, the qubit is controlled by a Zurich Instruments' SHFQC instrume
     import pathlib
 
     from laboneq.simple import DeviceSetup, SHFQC
-    from qibolab.components import AcquireChannel, IqChannel, IqConfig, AcquisitionConfig, OscillatorConfig
+    from qibolab.components import (
+        AcquireChannel,
+        IqChannel,
+        IqConfig,
+        AcquisitionConfig,
+        OscillatorConfig,
+    )
     from qibolab.instruments.zhinst import ZiChannel, Zurich
     from qibolab.platform import Platform
-    from qibolab.serialize import load_component_config, load_instrument_settings, load_qubits, load_runcard, load_settings
+    from qibolab.serialize import (
+        load_component_config,
+        load_instrument_settings,
+        load_qubits,
+        load_runcard,
+        load_settings,
+    )
 
     NAME = "my_platform"  # name of the platform
     ADDRESS = "localhost"  # ip address of the ZI data server
@@ -60,7 +72,9 @@ In this example, the qubit is controlled by a Zurich Instruments' SHFQC instrume
 
         # assign channels to qubits
         qubit.drive = IqChannel(name=drive, lo=drive_lo, mixer=None)
-        qubit.measure = IqChannel(name=measure, lo=measure_lo, mixer=None, acquisition=acquire)
+        qubit.measure = IqChannel(
+            name=measure, lo=measure_lo, mixer=None, acquisition=acquire
+        )
         qubit.acquisition = AcquireChannel(name=acquire, measure=measure, twpa_pump=None)
 
         configs = {}
@@ -76,11 +90,7 @@ In this example, the qubit is controlled by a Zurich Instruments' SHFQC instrume
             ZiChannel(qubit.acquisition, device="device_shfqc", path="QACHANNELS/0/INPUT"),
         ]
 
-        controller = Zurich(
-            NAME,
-            device_setup=device_setup,
-            channels=zi_channels
-        )
+        controller = Zurich(NAME, device_setup=device_setup, channels=zi_channels)
 
         instruments = load_instrument_settings(runcard, {controller.name: controller})
         settings = load_settings(runcard)

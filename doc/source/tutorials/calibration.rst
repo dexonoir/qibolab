@@ -125,7 +125,9 @@ complex pulse sequence. Therefore with start with that:
 
     # create pulse sequence and add pulses
     sequence = PulseSequence()
-    sequence[qubit.drive.name].append(Pulse(duration=2000, amplitude=0.01, envelope=Gaussian(rel_sigma=5)))
+    sequence[qubit.drive.name].append(
+        Pulse(duration=2000, amplitude=0.01, envelope=Gaussian(rel_sigma=5))
+    )
     sequence[qubit.measure.name].append(Delay(duration=sequence.duration))
     sequence.extend(qubit.native_gates.MZ.create_sequence())
 
