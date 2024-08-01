@@ -263,14 +263,16 @@ class SingleQubitNatives:
     RX: Optional[NativePulse] = None
     """Pulse to drive the qubit from state 0 to state 1."""
     RX12: Optional[NativePulse] = None
-    """Pulse to drive to qubit from state 1 to state 2."""
+    """Pulse to drive to qubit from state |1> to state |2>."""
+    RX90: Optional[NativePulse] = None
+    # """Pulse to drive to qubit from state |0> to state |0>+|1>."""
     MZ: Optional[NativePulse] = None
     """Measurement pulse."""
 
-    @property
-    def RX90(self) -> NativePulse:
-        """RX90 native pulse is inferred from RX by halving its amplitude."""
-        return replace(self.RX, name="RX90", amplitude=self.RX.amplitude / 2.0)
+    # @property
+    # def RX90(self) -> NativePulse:
+    #     """RX90 native pulse is inferred from RX by halving its amplitude."""
+    #     return replace(self.RX, name="RX90", amplitude=self.RX.amplitude / 2.0)
 
     @classmethod
     def from_dict(cls, qubit, native_gates):
@@ -286,6 +288,9 @@ class SingleQubitNatives:
             n: NativePulse.from_dict(n, pulse, qubit=qubit)
             for n, pulse in native_gates.items()
         }
+
+        if not "RX90" in pulses and "RX" in pulses:
+            pulses["RX90"] = replace( pulses["RX"], name="RX90", amplitude=pulses["RX"].amplitude / 2.0)
         return cls(**pulses)
 
     @property
