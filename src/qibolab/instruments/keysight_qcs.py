@@ -1,7 +1,5 @@
 """Qibolab driver for Keysight QCS instrument set."""
 
-from typing import Dict, Tuple
-
 import keysight.qcs as qcs  # pylint: disable=E0401
 
 from qibolab.execution_parameters import (
@@ -59,7 +57,7 @@ class KeysightQCS(Controller):
         name,
         address,
         channel_mapper: qcs.ChannelMapper,
-        qubit_readout_channels: Dict[QubitId, qcs.Channels],
+        qubit_readout_channels: dict[QubitId, qcs.Channels],
     ):
         super().__init__(name, address)
         self.mapper = channel_mapper
@@ -81,7 +79,7 @@ class KeysightQCS(Controller):
 
         # Sweeper management
         scount = 0
-        sweeper_pulse_map: Dict[Pulse, Tuple[str, qcs.Scalar]] = {}
+        sweeper_pulse_map: dict[Pulse, tuple[str, qcs.Scalar]] = {}
         for sweeper in sweepers:
             if sweeper.parameter in [
                 Parameter.attenuation,
