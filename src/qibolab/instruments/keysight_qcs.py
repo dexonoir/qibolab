@@ -157,6 +157,8 @@ class KeysightQCS(Controller):
 
         # Set the number of shots
         program.n_shots(options.nshots)
+        # Set the relaxation time
+        self.backend.init_time = options.relaxation_time * 1e-9
         # Run the program on the backend
         self.backend.apply(program)
 
