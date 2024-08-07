@@ -6,6 +6,7 @@ import operator
 from typing import Dict, List, Union
 
 import numpy as np
+import numpy.typing as npt
 
 from qibolab import AcquisitionType, AveragingMode, ExecutionParameters
 from qibolab.couplers import Coupler
@@ -14,7 +15,7 @@ from qibolab.instruments.emulator.engines.qutip_engine import QutipSimulator
 from qibolab.instruments.emulator.models import general_no_coupler_model
 from qibolab.pulses import PulseSequence, PulseType
 from qibolab.qubits import Qubit, QubitId
-from qibolab.result import IntegratedResults, SampleResults
+from qibolab.result import average, collect
 from qibolab.sweeper import Parameter, Sweeper, SweeperType
 
 AVAILABLE_SWEEP_PARAMETERS = {
@@ -135,7 +136,7 @@ class PulseSimulator(Controller):
         couplers: Dict[QubitId, Coupler],
         sequence: PulseSequence,
         execution_parameters: ExecutionParameters,
-    ) -> dict[str, Union[IntegratedResults, SampleResults]]:
+    ) -> dict[str, npt.NDArray]:
         """Executes the sequence of instructions and generates readout results,
         as well as simulation-related time and states data.
 
@@ -154,7 +155,7 @@ class PulseSimulator(Controller):
             Qibolab results object, as well as simulation-related time and states data.
         """
         nshots = execution_parameters.nshots
-        ro_pulse_list = sequence.ro_pulses
+        ro_pulse_list = sequence.probe_pulses
         times_dict, output_states, ro_reduced_dm, rdm_qubit_list = (
             self.run_pulse_simulation(sequence, self.instant_measurement)
         )
@@ -189,7 +190,7 @@ class PulseSimulator(Controller):
         sequence: PulseSequence,
         execution_parameters: ExecutionParameters,
         *sweeper: List[Sweeper],
-    ) -> dict[str, Union[IntegratedResults, SampleResults, dict]]:
+    ) -> dict[str, Union[npt.NDArray, dict]]:
         """Executes the sweep and generates readout results, as well as
         simulation-related time and states data.
 
@@ -249,7 +250,7 @@ class PulseSimulator(Controller):
 
         # reshape and reformat samples to results format
         results = get_results_from_samples(
-            sequence.ro_pulses, sweep_samples, execution_parameters, sweeper_shape
+            sequence.probe_pulses, sweep_samples, execution_parameters, sweeper_shape
         )
 
         # Reset pulse values back to original values (following icarusqfpga)
@@ -358,7 +359,7 @@ class PulseSimulator(Controller):
             dict: A tuple with dictionary containing simulation-related time data, a list of states at each time step in the simulation, and a dictionary mapping the qubit indices to list of sampled values.
         """
         nshots = execution_parameters.nshots
-        ro_pulse_list = sequence.ro_pulses
+        ro_pulse_list = sequence.probe_pulses
 
         # run pulse simulation
         times_dict, state_history, ro_reduced_dm, rdm_qubit_list = (
@@ -379,9 +380,9 @@ class PulseSimulator(Controller):
 
     @staticmethod
     def merge_sweep_results(
-        dict_a: """dict[str, Union[IntegratedResults, SampleResults, list]]""",
-        dict_b: """dict[str, Union[IntegratedResults, SampleResults, list]]""",
-    ) -> """dict[str, Union[IntegratedResults, SampleResults, list]]""":
+        dict_a: """dict[str, Union[npt.NDArray, list]]""",
+        dict_b: """dict[str, Union[npt.NDArray, list]]""",
+    ) -> """dict[str, Union[npt.NDArray, list]]""":
         """Merges two dictionary mapping pulse serial to Qibolab results
         object.
 
@@ -646,7 +647,7 @@ def get_results_from_samples(
     samples: dict[Union[str, int], list],
     execution_parameters: ExecutionParameters,
     prepend_to_shape: list = [],
-) -> dict[str, Union[IntegratedResults, SampleResults]]:
+) -> dict[str, npt.NDArray]:
     """Converts samples into Qibolab results format.
 
     Args:
@@ -673,10 +674,11 @@ def get_results_from_samples(
         values = np.array(samples[ro_pulse.qubit]).reshape(shape).transpose(tshape)
 
         if execution_parameters.acquisition_type is AcquisitionType.DISCRIMINATION:
-            processed_values = SampleResults(values)
+            processed_values = values
 
         elif execution_parameters.acquisition_type is AcquisitionType.INTEGRATION:
-            processed_values = IntegratedResults(values.astype(np.complex128))
+            vals = values.astype(np.complex128)
+            processed_values = collect(vals.real, vals.imag)
 
         else:
             raise ValueError(
@@ -684,9 +686,7 @@ def get_results_from_samples(
             )
 
         if execution_parameters.averaging_mode is AveragingMode.CYCLIC:
-            processed_values = (
-                processed_values.average
-            )  # generates AveragedSampleResults
+            processed_values = average(processed_values)
 
         results[ro_pulse.qubit] = results[ro_pulse.serial] = processed_values
     return results

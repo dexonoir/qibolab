@@ -16,11 +16,6 @@ from qibolab.instruments.rfsoc.convert import (
 )
 from qibolab.pulses import Drag, Gaussian, Pulse, PulseSequence, PulseType, Rectangular
 from qibolab.qubits import Qubit
-from qibolab.result import (
-    AveragedIntegratedResults,
-    AveragedSampleResults,
-    IntegratedResults,
-)
 from qibolab.sweeper import Parameter, Sweeper, SweeperType
 
 from .conftest import get_instrument
@@ -688,7 +683,7 @@ def test_convert_av_sweep_results(dummy_qrc):
         averaging_mode=AveragingMode.CYCLIC,
     )
     out_dict = instrument.convert_sweep_results(
-        sequence.ro_pulses, platform.qubits, avgi, avgq, execution_parameters
+        sequence.probe_pulses, platform.qubits, avgi, avgq, execution_parameters
     )
     targ_dict = {
         serial1: AveragedIntegratedResults(
@@ -741,7 +736,7 @@ def test_convert_nav_sweep_results(dummy_qrc):
         averaging_mode=AveragingMode.CYCLIC,
     )
     out_dict = instrument.convert_sweep_results(
-        sequence.ro_pulses, platform.qubits, avgi, avgq, execution_parameters
+        sequence.probe_pulses, platform.qubits, avgi, avgq, execution_parameters
     )
     targ_dict = {
         serial1: AveragedIntegratedResults(

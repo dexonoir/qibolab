@@ -1,15 +1,8 @@
 from enum import Enum, auto
-from typing import Optional
+from typing import Any, Optional
 
-from qibolab.result import (
-    AveragedIntegratedResults,
-    AveragedRawWaveformResults,
-    AveragedSampleResults,
-    IntegratedResults,
-    RawWaveformResults,
-    SampleResults,
-)
 from qibolab.serialize_ import Model
+from qibolab.sweeper import ParallelSweepers
 
 
 class AcquisitionType(Enum):
@@ -36,19 +29,18 @@ class AveragingMode(Enum):
     SEQUENTIAL = auto()
     """SEQUENTIAL: Worse averaging for noise[Avoid]"""
 
+    @property
+    def average(self) -> bool:
+        """Whether an average is performed or not."""
+        return self is not AveragingMode.SINGLESHOT
 
-RESULTS_TYPE = {
-    AveragingMode.CYCLIC: {
-        AcquisitionType.INTEGRATION: AveragedIntegratedResults,
-        AcquisitionType.RAW: AveragedRawWaveformResults,
-        AcquisitionType.DISCRIMINATION: AveragedSampleResults,
-    },
-    AveragingMode.SINGLESHOT: {
-        AcquisitionType.INTEGRATION: IntegratedResults,
-        AcquisitionType.RAW: RawWaveformResults,
-        AcquisitionType.DISCRIMINATION: SampleResults,
-    },
-}
+
+ConfigUpdate = dict[str, dict[str, Any]]
+"""Update for component configs.
+
+Maps component name to corresponding update, which in turn is a map from
+config property name that needs an update to its new value.
+"""
 
 
 class ExecutionParameters(Model):
@@ -71,8 +63,28 @@ class ExecutionParameters(Model):
     """Data acquisition type."""
     averaging_mode: AveragingMode = AveragingMode.SINGLESHOT
     """Data averaging mode."""
+    updates: list[ConfigUpdate] = []
+    """List of updates for component configs.
 
-    @property
-    def results_type(self):
-        """Returns corresponding results class."""
-        return RESULTS_TYPE[self.averaging_mode][self.acquisition_type]
+    Later entries in the list take precedence over earlier ones (if they
+    happen to update the same thing). These updates will be applied on
+    top of platform defaults.
+    """
+
+    def results_shape(
+        self, sweepers: list[ParallelSweepers], samples: Optional[int] = None
+    ) -> tuple[int, ...]:
+        """Compute the expected shape for collected data."""
+
+        shots = (
+            (self.nshots,) if self.averaging_mode is AveragingMode.SINGLESHOT else ()
+        )
+        sweeps = tuple(
+            min(len(sweep.values) for sweep in parsweeps) for parsweeps in sweepers
+        )
+        inner = {
+            AcquisitionType.DISCRIMINATION: (),
+            AcquisitionType.INTEGRATION: (2,),
+            AcquisitionType.RAW: (samples, 2),
+        }[self.acquisition_type]
+        return shots + sweeps + inner

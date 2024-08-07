@@ -2,7 +2,6 @@
 
 import re
 from dataclasses import asdict, dataclass
-from typing import Union
 
 import numpy as np
 import numpy.typing as npt
@@ -13,10 +12,8 @@ from qibosoq import client
 from qibolab import AcquisitionType, AveragingMode, ExecutionParameters
 from qibolab.couplers import Coupler
 from qibolab.instruments.abstract import Controller
-from qibolab.instruments.port import Port
 from qibolab.pulses import PulseSequence, PulseType
 from qibolab.qubits import Qubit
-from qibolab.result import AveragedSampleResults, IntegratedResults, SampleResults
 from qibolab.sweeper import BIAS, Sweeper
 
 from .convert import convert, convert_units_sweeper
@@ -26,7 +23,7 @@ NS_TO_US = 1e-3
 
 
 @dataclass
-class RFSoCPort(Port):
+class RFSoCPort:
     """Port object of the RFSoC."""
 
     name: int
@@ -109,7 +106,7 @@ class RFSoC(Controller):
                 raise NotImplementedError(
                     "Raw data acquisition is not compatible with sweepers"
                 )
-            if len(sequence.ro_pulses) != 1:
+            if len(sequence.probe_pulses) != 1:
                 raise NotImplementedError(
                     "Raw data acquisition is compatible only with a single readout"
                 )
@@ -120,9 +117,9 @@ class RFSoC(Controller):
 
     @staticmethod
     def merge_sweep_results(
-        dict_a: dict[str, Union[IntegratedResults, SampleResults]],
-        dict_b: dict[str, Union[IntegratedResults, SampleResults]],
-    ) -> dict[str, Union[IntegratedResults, SampleResults]]:
+        dict_a: dict[str, npt.NDArray],
+        dict_b: dict[str, npt.NDArray],
+    ) -> dict[str, npt.NDArray]:
         """Merge two dictionary mapping pulse serial to Results object.
 
         If dict_b has a key (serial) that dict_a does not have, simply add it,
@@ -136,32 +133,20 @@ class RFSoC(Controller):
         """
         for serial in dict_b:
             if serial in dict_a:
-                data = lambda res: (
-                    res.voltage if isinstance(res, IntegratedResults) else res.samples
-                )
-                dict_a[serial] = type(dict_a[serial])(
-                    np.append(data(dict_a[serial]), data(dict_b[serial]))
-                )
+                dict_a[serial] = np.append(dict_a[serial], dict_b[serial])
             else:
                 dict_a[serial] = dict_b[serial]
         return dict_a
 
     @staticmethod
-    def reshape_sweep_results(results, sweepers, execution_parameters):
-        shape = [len(sweeper.values) for sweeper in sweepers]
-        if execution_parameters.averaging_mode is not AveragingMode.CYCLIC:
-            shape.insert(0, execution_parameters.nshots)
-
-        def data(value):
-            if isinstance(value, IntegratedResults):
-                data = value.voltage
-            elif isinstance(value, AveragedSampleResults):
-                data = value.statistical_frequency
-            else:
-                data = value.samples
-            return type(value)(data.reshape(shape))
-
-        return {key: data(value) for key, value in results.items()}
+    def reshape_sweep_results(
+        results, sweepers, execution_parameters: ExecutionParameters
+    ):
+        # TODO: pay attention: the following will not work in raw waveform acquisition
+        # modes, in which case the number of samples taken should be passed as an
+        # explicit parameter
+        shape = execution_parameters.results_shape(sweepers)
+        return {key: value.reshape(shape) for key, value in results.items()}
 
     def _execute_pulse_sequence(
         self,
@@ -219,7 +204,7 @@ class RFSoC(Controller):
         couplers: dict[int, Coupler],
         sequence: PulseSequence,
         execution_parameters: ExecutionParameters,
-    ) -> dict[str, Union[IntegratedResults, SampleResults]]:
+    ) -> dict[str, npt.NDArray]:
         """Execute the sequence of instructions and retrieves readout results.
 
         Each readout pulse generates a separate acquisition.
@@ -260,10 +245,10 @@ class RFSoC(Controller):
         toti, totq = self._execute_pulse_sequence(sequence, qubits, opcode)
 
         results = {}
-        probed_qubits = np.unique([p.qubit for p in sequence.ro_pulses])
+        probed_qubits = np.unique([p.qubit for p in sequence.probe_pulses])
 
         for j, qubit in enumerate(probed_qubits):
-            for i, ro_pulse in enumerate(sequence.ro_pulses.get_qubit_pulses(qubit)):
+            for i, ro_pulse in enumerate(sequence.probe_pulses.get_qubit_pulses(qubit)):
                 i_pulse = np.array(toti[j][i])
                 q_pulse = np.array(totq[j][i])
 
@@ -318,7 +303,7 @@ class RFSoC(Controller):
         sequence: PulseSequence,
         or_sequence: PulseSequence,
         execution_parameters: ExecutionParameters,
-    ) -> dict[str, Union[IntegratedResults, SampleResults]]:
+    ) -> dict[str, npt.NDArray]:
         """Last recursion layer, if no sweeps are present.
 
         After playing the sequence, the resulting dictionary keys need
@@ -329,7 +314,7 @@ class RFSoC(Controller):
         """
         res = self.play(qubits, couplers, sequence, execution_parameters)
         newres = {}
-        serials = [pulse.id for pulse in or_sequence.ro_pulses]
+        serials = [pulse.id for pulse in or_sequence.probe_pulses]
         for idx, key in enumerate(res):
             if idx % 2 == 1:
                 newres[serials[idx // 2]] = res[key]
@@ -346,7 +331,7 @@ class RFSoC(Controller):
         or_sequence: PulseSequence,
         *sweepers: rfsoc.Sweeper,
         execution_parameters: ExecutionParameters,
-    ) -> dict[str, Union[IntegratedResults, SampleResults]]:
+    ) -> dict[str, npt.NDArray]:
         """Execute a sweep of an arbitrary number of Sweepers via recursion.
 
         Args:
@@ -392,7 +377,7 @@ class RFSoC(Controller):
                 val = val.astype(int)
             values.append(val)
 
-        results: dict[str, Union[IntegratedResults, SampleResults]] = {}
+        results: dict[str, npt.NDArray] = {}
         for idx in range(sweeper.expts):
             # update values
             for jdx, kdx in enumerate(sweeper.indexes):
@@ -489,7 +474,7 @@ class RFSoC(Controller):
         toti: list[list[list[float]]],
         totq: list[list[list[float]]],
         execution_parameters: ExecutionParameters,
-    ) -> dict[str, Union[IntegratedResults, SampleResults]]:
+    ) -> dict[str, npt.NDArray]:
         """Convert sweep res to qibolab dict res.
 
         Args:
@@ -547,7 +532,7 @@ class RFSoC(Controller):
         sequence: PulseSequence,
         execution_parameters: ExecutionParameters,
         *sweepers: Sweeper,
-    ) -> dict[str, Union[IntegratedResults, SampleResults]]:
+    ) -> dict[str, npt.NDArray]:
         """Execute the sweep and retrieves the readout results.
 
         Each readout pulse generates a separate acquisition.
@@ -597,7 +582,7 @@ class RFSoC(Controller):
             qubits,
             couplers,
             sweepsequence,
-            sequence.ro_pulses,
+            sequence.probe_pulses,
             *rfsoc_sweepers,
             execution_parameters=execution_parameters,
         )

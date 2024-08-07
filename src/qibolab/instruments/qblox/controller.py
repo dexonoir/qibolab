@@ -12,7 +12,6 @@ from qibolab.instruments.qblox.cluster_qcm_rf import QcmRf
 from qibolab.instruments.qblox.cluster_qrm_rf import QrmRf
 from qibolab.instruments.qblox.sequencer import SAMPLING_RATE
 from qibolab.pulses import PulseSequence, PulseType
-from qibolab.result import SampleResults
 from qibolab.sweeper import Parameter, Sweeper, SweeperType
 from qibolab.unrolling import Bounds
 
@@ -196,14 +195,17 @@ class QbloxController(Controller):
         # retrieve the results
         acquisition_results = {}
         for name, module in self.modules.items():
-            if isinstance(module, QrmRf) and not module_pulses[name].ro_pulses.is_empty:
+            if (
+                isinstance(module, QrmRf)
+                and not module_pulses[name].probe_pulses.is_empty
+            ):
                 results = module.acquire()
                 for key, value in results.items():
                     acquisition_results[key] = value
         # TODO: move to QRM_RF.acquire()
         shape = tuple(len(sweeper.values) for sweeper in reversed(sweepers))
         shots_shape = (nshots,) + shape
-        for ro_pulse in sequence.ro_pulses:
+        for ro_pulse in sequence.probe_pulses:
             if options.acquisition_type is AcquisitionType.DISCRIMINATION:
                 _res = acquisition_results[ro_pulse.id].classified
                 _res = np.reshape(_res, shots_shape)
@@ -284,7 +286,7 @@ class QbloxController(Controller):
             sweepers_copy.reverse()
 
         # create a map between the pulse id, which never changes, and the original serial
-        for pulse in sequence_copy.ro_pulses:
+        for pulse in sequence_copy.probe_pulses:
             map_id_serial[pulse.id] = pulse.id
             id_results[pulse.id] = None
             id_results[pulse.qubit] = None
@@ -300,7 +302,7 @@ class QbloxController(Controller):
 
         # return the results using the original serials
         serial_results = {}
-        for pulse in sequence_copy.ro_pulses:
+        for pulse in sequence_copy.probe_pulses:
             serial_results[map_id_serial[pulse.id]] = id_results[pulse.id]
             serial_results[pulse.qubit] = id_results[pulse.id]
         return serial_results
@@ -395,7 +397,7 @@ class QbloxController(Controller):
                     result = self._execute_pulse_sequence(
                         qubits=qubits, sequence=sequence, options=options
                     )
-                    for pulse in sequence.ro_pulses:
+                    for pulse in sequence.probe_pulses:
                         if results[pulse.id]:
                             results[pulse.id] += result[pulse.id]
                         else:
@@ -520,19 +522,16 @@ class QbloxController(Controller):
     def _combine_result_chunks(chunks):
         some_chunk = next(iter(chunks))
         some_result = next(iter(some_chunk.values()))
-        attribute = "samples" if isinstance(some_result, SampleResults) else "voltage"
         return {
             key: some_result.__class__(
-                np.concatenate(
-                    [getattr(chunk[key], attribute) for chunk in chunks], axis=0
-                )
+                np.concatenate([chunk[key] for chunk in chunks], axis=0)
             )
             for key in some_chunk.keys()
         }
 
     @staticmethod
     def _add_to_results(sequence, results, results_to_add):
-        for pulse in sequence.ro_pulses:
+        for pulse in sequence.probe_pulses:
             if results[pulse.id]:
                 results[pulse.id] += results_to_add[pulse.id]
             else:
