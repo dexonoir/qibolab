@@ -12,12 +12,13 @@ from qibolab.pulses import (
     Drag,
     Envelope,
     Gaussian,
-    Pulse,
     PulseSequence,
     PulseType,
     Rectangular,
 )
-from qibolab.sweeper import Parameter, Sweeper
+from qibolab.sweeper import ParallelSweepers, Parameter
+
+SWEEPER_PARAMETER_MAP = {Parameter.relative_phase: "instantaneous_phase"}
 
 
 def generate_envelope_qcs(shape: Envelope):
@@ -57,43 +58,51 @@ class KeysightQCS(Controller):
             self.is_connected = True
 
     def play(
-        self, sequence: PulseSequence, options: ExecutionParameters, *sweepers: Sweeper
+        self,
+        sequence: PulseSequence,
+        options: ExecutionParameters,
+        sweepers: list[ParallelSweepers],
     ):
 
         program = qcs.Program()
 
         # Sweeper management
         scount = 0
-        sweeper_pulse_map: dict[Pulse, tuple[str, qcs.Scalar]] = {}
-        for sweeper in sweepers:
-            if sweeper.parameter in [
-                Parameter.attenuation,
-                Parameter.bias,
-                Parameter.gain,
-                Parameter.lo_frequency,
-            ]:
-                raise ValueError("Sweeper parameter not supported")
+        sweeper_pulse_map: dict[int, tuple[str, qcs.Scalar]] = {}
+        for parallel_sweeper in sweepers:
 
             sweeper_arrays = []
             sweeper_variables = []
 
-            for pulse in sweeper.pulses:
-                sweeper_name = f"s{scount}"
-                parameter = sweeper.parameter.name
-                qcs_var = qcs.Scalar(sweeper_name, dtype=float)
-                sweeper_variables.append(qcs_var)
-                sweeper_arrays.append(
-                    qcs.Array(
-                        sweeper_name,
-                        value=sweeper.get_values(
-                            getattr(pulse, parameter), dtype=float
-                        ),
-                    )
-                )
-                sweeper_pulse_map[pulse] = (parameter, qcs_var)
-                scount += 1
+            for sweeper in parallel_sweeper:
+                if sweeper.parameter in [
+                    Parameter.attenuation,
+                    Parameter.bias,
+                    Parameter.gain,
+                    Parameter.lo_frequency,
+                ]:
+                    raise ValueError("Sweeper parameter not supported")
 
-            # For the same sweeper, the variables can be swept simultaneously
+                for pulse in sweeper.pulses:
+                    sweeper_name = f"s{scount}"
+                    parameter = sweeper.parameter.name
+                    qcs_var = qcs.Scalar(sweeper_name, dtype=float)
+                    sweeper_variables.append(qcs_var)
+                    sweeper_arrays.append(
+                        qcs.Array(
+                            sweeper_name,
+                            value=sweeper.get_values(
+                                getattr(pulse, parameter), dtype=float
+                            ),
+                        )
+                    )
+                    sweeper_pulse_map[pulse.id] = (
+                        SWEEPER_PARAMETER_MAP.get(sweeper.parameter, parameter),
+                        qcs_var,
+                    )
+                    scount += 1
+
+            # For the same sweeper or parallel sweepers, the variables can be swept simultaneously
             program.sweep(sweeper_arrays, sweeper_variables)
 
         # Map of virtual Z rotations to qubits for phase tracking
@@ -140,7 +149,7 @@ class KeysightQCS(Controller):
                         qcs_pulse = qcs_pulse.drag(pulse.shape.beta)
 
                 # If this pulse is part of a sweeper, set the variable
-                if pulse in sweeper_pulse_map:
+                if pulse.id in sweeper_pulse_map:
                     parameter, qcs_var = sweeper_pulse_map[pulse]
                     setattr(qcs_pulse, parameter, qcs_var)
                 program.add_waveform(qcs_pulse, qcs_channel)
