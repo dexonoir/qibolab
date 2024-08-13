@@ -16,12 +16,12 @@ from qibolab.execution_parameters import ExecutionParameters
 from qibolab.instruments.abstract import Controller
 from qibolab.pulses import Delay, Pulse, VirtualZ
 from qibolab.sequence import PulseSequence
-from qibolab.sweeper import ParallelSweepers, Parameter
+from qibolab.sweeper import ParallelSweepers, Parameter, Sweeper
 from qibolab.unrolling import Bounds
 
 from .components import QmChannel
 from .config import SAMPLING_RATE, QmConfig, operation
-from .program import create_acquisition, program
+from .program import ExecutionArguments, create_acquisition, program
 
 OCTAVE_ADDRESS_OFFSET = 11000
 """Offset to be added to Octave addresses, because they must be 11xxx, where
@@ -109,6 +109,11 @@ def fetch_results(result, acquisitions):
     return {
         key: value[0] if len(value) == 1 else value for key, value in results.items()
     }
+
+
+def find_duration_sweepers(sweepers: list[ParallelSweepers]) -> list[Sweeper]:
+    """Find duration sweepers in order to register multiple pulses."""
+    return [s for ps in sweepers for s in ps if s.parameter is Parameter.duration]
 
 
 @dataclass
@@ -290,8 +295,9 @@ class QmController(Controller):
             channel = self.channels[channel_name]
             self.configure_channel(channel, configs)
 
-    def register_pulse(self, channel: Channel, pulse: Pulse):
-        """Add pulse in the QM ``config``."""
+    def register_pulse(self, channel: Channel, pulse: Pulse) -> str:
+        """Add pulse in the QM ``config`` and return corresponding
+        operation."""
         # if (
         #    pulse.duration % 4 != 0
         #    or pulse.duration < 16
@@ -305,6 +311,23 @@ class QmController(Controller):
         if channel.acquisition is None:
             return self.config.register_iq_pulse(channel.name, pulse)
         return self.config.register_acquisition_pulse(channel.name, pulse)
+
+    def register_duration_sweeper_pulses(
+        self, args: ExecutionArguments, sweeper: Sweeper
+    ):
+        """Register pulse with many different durations, in order to sweep
+        duration."""
+        for pulse in sweeper.pulses:
+            if isinstance(pulse, Delay):
+                continue
+
+            op = operation(pulse)
+            channel_name = args.sequence.pulse_channel(pulse.id)
+            channel = self.channels[channel_name].logical_channel
+            for value in sweeper.values:
+                sweep_pulse = pulse.model_copy(updates={"duration": value})
+                sweep_op = self.register_pulse(channel, new_pulse)
+                args.parameters[op].pulses.append((value, sweep_op))
 
     def register_pulses(
         self,
@@ -322,15 +345,11 @@ class QmController(Controller):
             if isinstance(pulse, (Delay, VirtualZ)):
                 continue
 
-            channel = self.channels[channel_name]
-            logical_channel = channel.logical_channel
-            op = self.register_pulse(logical_channel, pulse)
+            channel = self.channels[channel_name].logical_channel
+            op = self.register_pulse(channel, pulse)
 
-            if (
-                isinstance(logical_channel, IqChannel)
-                and logical_channel.acquisition is not None
-            ):
-                acq_config = configs[logical_channel.acquisition]
+            if isinstance(channel, IqChannel) and channel.acquisition is not None:
+                acq_config = configs[channel.acquisition]
                 self.config.register_integration_weights(
                     channel_name, pulse.duration, acq_config.kernel
                 )
@@ -384,7 +403,13 @@ class QmController(Controller):
         sequence = sequences[0]
         self.configure_channels(configs, sequence.channels)
         acquisitions = self.register_pulses(configs, sequence, options)
-        experiment = program(configs, sequence, options, acquisitions, sweepers)
+
+        args = ExecutionArguments(sequence, acquisitions, options.relaxation_time)
+
+        for sweeper in find_duration_sweepers(sweepers):
+            self.register_duration_sweeper_pulses(args, sweeper)
+
+        experiment = program(configs, args, options, sweepers)
 
         if self.manager is None:
             warnings.warn(
