@@ -17,6 +17,8 @@ __all__ = ["PulseSequence"]
 
 _Element = tuple[ChannelId, PulseLike]
 
+_adapted_sequence = TypeAdapter(list[_Element])
+
 
 class PulseSequence(UserList[_Element]):
     """Synchronized sequence of control instructions across multiple channels.
@@ -47,7 +49,7 @@ class PulseSequence(UserList[_Element]):
 
     @staticmethod
     def _serialize(value):
-        return TypeAdapter(list[_Element]).dump_python(list(value))
+        return _adapted_sequence.dump_python(list(value))
 
     @classmethod
     def load(cls, value: list[tuple[str, PulseLike]]):
