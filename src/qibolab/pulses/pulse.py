@@ -80,4 +80,8 @@ class VirtualZ(_PulseLike):
         return 0
 
 
-PulseLike = Union[Pulse, Delay, VirtualZ]
+class Align(_PulseLike):
+    """Brings different channels at the same point in time."""
+
+
+PulseLike = Union[Pulse, Delay, VirtualZ, Align]

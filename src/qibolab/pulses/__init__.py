@@ -1,2 +1,2 @@
 from .envelope import *
-from .pulse import Delay, Pulse, PulseLike, VirtualZ
+from .pulse import Align, Delay, Pulse, PulseLike, VirtualZ

@@ -14,7 +14,7 @@ from qualang_tools.simulator_tools import create_simulator_controller_connection
 from qibolab.components import Channel, ChannelId, Config, DcChannel, IqChannel
 from qibolab.execution_parameters import ExecutionParameters
 from qibolab.instruments.abstract import Controller
-from qibolab.pulses import Delay, Pulse, VirtualZ
+from qibolab.pulses import Align, Delay, Pulse, VirtualZ
 from qibolab.sequence import PulseSequence
 from qibolab.sweeper import ParallelSweepers, Parameter, Sweeper
 from qibolab.unrolling import Bounds
@@ -342,7 +342,7 @@ class QmController(Controller):
         """
         acquisitions = {}
         for channel_name, pulse in sequence:
-            if isinstance(pulse, (Delay, VirtualZ)):
+            if isinstance(pulse, (Align, Delay, VirtualZ)):
                 continue
 
             channel = self.channels[channel_name].logical_channel
